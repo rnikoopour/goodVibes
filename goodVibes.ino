@@ -1,6 +1,9 @@
 #include <IRLib.h>
 #include "remote.h"
 
+//#define DEBUGLIGHT
+//#define DEBUGAUDIO
+
 IRsend My_Sender;
 // AC pins
 short audioPin = 0; 
@@ -14,7 +17,7 @@ short offBrightness = 500;
 short onBrightness = 400;
 short sampleWindow = 50;
 short colorWaitTime = 500;
-long lastChangeTime = millis();
+unsigned long lastChangeTime = millis();
 
 bool lightOn = false;
  
@@ -26,6 +29,10 @@ void setup()
 }
  
 void loop() {
+  if (millis() < lastChangeTime) {
+    lastChangeTime = 0;
+  }
+  
   handleLightPower();
   if (lightOn) {
     handleColorChange();
@@ -34,7 +41,9 @@ void loop() {
 
 void handleColorChange() {
   float audioLevel = SampleAudio(audioPin);
+  #ifdef DEBUGAUDIO
   Serial.println(audioLevel);
+  #endif
   if (audioLevel >= colorChangeLevel &&
       millis() - lastChangeTime >= colorWaitTime) {
     short rand = 0;
@@ -46,7 +55,9 @@ void handleColorChange() {
 
 void handleLightPower() {
   double lightLevel = SampleLight(lightPin);
+  #ifdef DEBUGLIGHT
   Serial.println(lightLevel);
+  #endif
   if (lightLevel > offBrightness ) {
     pressButton(&My_Sender, offBtn);
     lightOn = false;
