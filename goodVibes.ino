@@ -22,7 +22,7 @@ void setup()
 {
   randomSeed(analogRead(0));
   Serial.begin(9600);
-  pressButton(offBtn);
+  pressButton(&My_Sender, offBtn);
 }
  
 void loop() {
@@ -32,10 +32,6 @@ void loop() {
   }
 }
 
-void pressButton(int button) {
-  My_Sender.send(NEC, buttons[button], 32);
-}
-
 void handleColorChange() {
   float audioLevel = SampleAudio(audioPin);
   Serial.println(audioLevel);
@@ -43,7 +39,7 @@ void handleColorChange() {
       millis() - lastChangeTime >= colorWaitTime) {
     short rand = 0;
     rand = random(1, numButtons-1);
-    pressButton(rand);
+    pressButton(&My_Sender, rand);
     lastChangeTime = millis();
   }
 }
@@ -52,10 +48,10 @@ void handleLightPower() {
   double lightLevel = SampleLight(lightPin);
   Serial.println(lightLevel);
   if (lightLevel > offBrightness ) {
-    pressButton(offBtn);
+    pressButton(&My_Sender, offBtn);
     lightOn = false;
   } else if (lightLevel < onBrightness) {
-    pressButton(onBtn);
+    pressButton(&My_Sender, onBtn);
     lightOn = true;
   }
 }
