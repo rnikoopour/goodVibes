@@ -1,3 +1,6 @@
+#ifndef REMOTE
+#define REMOTE
+
 #define on 0xF7C03F
 #define red1 0xF7609F
 #define red2 0xF750AF
@@ -54,6 +57,10 @@ long buttons[] = {
   off
 };
 
-
-
 char numButtons = 17;
+
+void pressButton(IRsend *My_Sender, int button) {
+  My_Sender->send(NEC, buttons[button], 32);
+}
+
+#endif
