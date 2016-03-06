@@ -2,23 +2,27 @@
 #include "remote.h"
 
 //#define DEBUGLIGHT
-//#define DEBUGAUDIO
+#define DEBUGAUDIO
 
 IRsend My_Sender;
 // AC pins
-short audioPin = 0; 
-short lightPin = 1;
+const char audioPin = 0; 
+const char lightPin = 1;
 
 // DC Pins
-// irPin = 3 for timing purposes or something. Can't be changed.
+// const char irPin = 3 required for timing
 
-double colorChangeLevel = 0.2;
-short offBrightness = 500;
-short onBrightness = 400;
-short sampleWindow = 50;
-short colorWaitTime = 500;
+const float colorChangeLevel = 0.5;
+
+const short offBrightness = 500;
+const short onBrightness = 400;
+const short colorWaitTime = 1000;
+
+const char sampleWindow = 50;
+const char numAudioSamples = 20;
+
 unsigned long lastChangeTime = millis();
-
+float audioSamples[numAudioSamples] = {};
 bool lightOn = false;
  
 void setup()
@@ -26,10 +30,15 @@ void setup()
   randomSeed(analogRead(0));
   Serial.begin(9600);
   pressButton(&My_Sender, offBtn);
+
+  for (char i = 0; i < numAudioSamples; i++) {
+    audioSamples[i] = -1.0;
+  }
 }
  
 void loop() {
   if (millis() < lastChangeTime) {
+    // Handles millis() overflow (approx every 50 days)
     lastChangeTime = 0;
   }
   
@@ -39,25 +48,63 @@ void loop() {
   }
 }
 
+float getAudioAverage() {
+  float average = 0.0;
+  
+  for (char i = 0; i < numAudioSamples; i++) {
+    if (audioSamples[i] == -1.0) {
+      return -1.0;
+    } else {
+      average += audioSamples[i];
+    }
+  }
+  average /= numAudioSamples;
+  return average;
+}
+
 void handleColorChange() {
+  static char index = 0;
   float audioLevel = SampleAudio(audioPin);
+  float audioAverage = getAudioAverage();
+  float audioDelta = audioLevel - audioAverage;
+  audioSamples[index] = audioLevel;
+  index++;
+  index %= numAudioSamples;
   #ifdef DEBUGAUDIO
-  Serial.println(audioLevel);
+  if (index == numAudioSamples/2) {
+    Serial.print("AudioAve = ");
+    Serial.println(audioAverage);
+  }
   #endif
-  if (audioLevel >= colorChangeLevel &&
+
+  if (audioAverage != -1.0 &&
+      audioDelta >= colorChangeLevel &&
       millis() - lastChangeTime >= colorWaitTime) {
-    short rand = 0;
+    char rand = 0;
     rand = random(1, numButtons-1);
     pressButton(&My_Sender, rand);
     lastChangeTime = millis();
+  #ifdef DEBUGAUDIO
+    Serial.println();
+    Serial.print("AudioLevel = ");
+    Serial.println(audioLevel);
+    Serial.print("AudioAve = ");
+    Serial.println(audioAverage);
+    Serial.print("audioDelta = ");
+    Serial.println(audioDelta);
+    Serial.println();
+  #endif
+
+
   }
 }
 
 void handleLightPower() {
-  double lightLevel = SampleLight(lightPin);
+  short lightLevel = SampleLight(lightPin);
   #ifdef DEBUGLIGHT
   Serial.println(lightLevel);
   #endif
+  
   if (lightLevel > offBrightness ) {
     pressButton(&My_Sender, offBtn);
     lightOn = false;
@@ -67,7 +114,7 @@ void handleLightPower() {
   }
 }
 
-int SampleLight(short lightPin) {
+short SampleLight(short lightPin) {
   return 1023 - analogRead(lightPin);
 }
 
@@ -78,6 +125,7 @@ float SampleAudio(short audioPin) {
  
   unsigned int signalMax = 0;
   unsigned int signalMin = 1024;
+  static char index = 0;
  
   // collect data for 50 mS
   while (millis() - startMillis < sampleWindow)
@@ -96,8 +144,8 @@ float SampleAudio(short audioPin) {
 	}
     }
   peakToPeak = signalMax - signalMin;  // max - min = peak-peak amplitude
-  double volts = (peakToPeak * 3.3) / 1024;  // convert to volts
- 
+  float volts = (peakToPeak * 3.3) / 1024;  // convert to volts
+
   return volts;
 }
 
