@@ -2,7 +2,8 @@
 #include "remote.h"
 
 //#define DEBUGLIGHT
-#define DEBUGAUDIO
+//#define DEBUGAUDIO
+//#define DEBUGSENSITIVITY
 
 IRsend My_Sender;
 // AC pins
@@ -11,8 +12,10 @@ const char lightPin = 1;
 
 // DC Pins
 // const char irPin = 3 required for timing
+const char sensitivityBtn = 13;
 
-const float colorChangeLevel = 0.5;
+const char numSensitivities = 3;
+const float colorChangeLevel[] = {0.25, 0.5, 1.0};
 
 const short offBrightness = 500;
 const short onBrightness = 400;
@@ -23,20 +26,24 @@ const char numAudioSamples = 20;
 
 unsigned long lastChangeTime = millis();
 float audioSamples[numAudioSamples] = {};
+int sensitivityBtnState = HIGH;
+int sensitivity = 0;
+bool sensitivityPressed = false;
 bool lightOn = false;
  
 void setup()
 {
-  randomSeed(analogRead(0));
   Serial.begin(9600);
+  randomSeed(analogRead(0));
   pressButton(&My_Sender, offBtn);
-
   for (char i = 0; i < numAudioSamples; i++) {
     audioSamples[i] = -1.0;
   }
+  pinMode(sensitivityBtn, INPUT);
 }
  
 void loop() {
+  adjustSensitivity();
   if (millis() < lastChangeTime) {
     // Handles millis() overflow (approx every 50 days)
     lastChangeTime = 0;
@@ -46,6 +53,24 @@ void loop() {
   if (lightOn) {
     handleColorChange();
   }
+}
+
+void adjustSensitivity() {
+  sensitivityBtnState = digitalRead(sensitivityBtn);
+  if (sensitivityBtnState == LOW &&
+      !sensitivityPressed) {
+    sensitivityPressed = true;
+    sensitivity++;
+    sensitivity %= numSensitivities;
+    #ifdef DEBUGSENSITIVITY
+    Serial.println("Button pressed ");
+    Serial.print("Sensitiviy level = ");
+    Serial.println(colorChangeLevel[sensitivity]);
+    #endif
+  } else if (sensitivityBtnState == HIGH) {
+    sensitivityPressed = false;
+  }
+  
 }
 
 float getAudioAverage() {
@@ -78,7 +103,7 @@ void handleColorChange() {
   #endif
 
   if (audioAverage != -1.0 &&
-      audioDelta >= colorChangeLevel &&
+      audioDelta >= colorChangeLevel[sensitivity] &&
       millis() - lastChangeTime >= colorWaitTime) {
     char rand = 0;
     rand = random(1, numButtons-1);
@@ -148,4 +173,3 @@ float SampleAudio(short audioPin) {
 
   return volts;
 }
-
